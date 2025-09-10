@@ -1,41 +1,44 @@
-import os
+import os, hmac, hashlib, time
+from fastapi import FastAPI, Request
+from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Response
-from botbuilder.core import (
-    BotFrameworkAdapterSettings, TurnContext, ConversationState, MemoryStorage
-)
-from botbuilder.integration.aiohttp import BotFrameworkHttpAdapter
-from botbuilder.schema import Activity, ActivityTypes
-from command_router import handle_command
-
+from jira_client import jira_create_issue, jira_add_comment
+from llm_client import summarize_text_markdown
 load_dotenv()
-
 app = FastAPI()
-
-settings = BotFrameworkAdapterSettings(
-    app_id=os.getenv("MicrosoftAppId"), # pyright: ignore[reportArgumentType]
-    app_password=os.getenv("MicrosoftAppPassword"), # pyright: ignore[reportArgumentType]
-)
-adapter = BotFrameworkHttpAdapter(settings)
-memory = MemoryStorage()
-conversation_state = ConversationState(memory)
-
-@app.post("/api/messages")
-async def messages(req: Request):
-    body = await req.json()
-    activity = Activity().deserialize(body)
-
-    async def bot_logic(turn_context: TurnContext):
-        if turn_context.activity.type == ActivityTypes.message:
-            text = (turn_context.activity.text or "").strip()
-            # Teams often prefixes bot mentions; strip "<at>Bot</at>" etc.
-            t = " ".join(token for token in text.split() if not token.startswith("<at"))
-            result = await handle_command(t, turn_context)
-            if isinstance(result, str) and result:
-                await turn_context.send_activity(result)
-        else:
-            await turn_context.send_activity("👋")
-
-    resp: Response = Response(status_code=200)
-    await adapter.process_activity(activity, "", bot_logic)
-    return resp
+SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET")
+def verify_slack(req: Request, body: str):
+   ts = req.headers["x-slack-request-timestamp"]
+   if abs(time.time() - int(ts)) > 60*5:
+       return False
+   sig_basestring = f"v0:{ts}:{body}".encode()
+   my_sig = "v0=" + hmac.new(
+       SLACK_SIGNING_SECRET.encode(), # pyright: ignore[reportOptionalMemberAccess]
+       sig_basestring, hashlib.sha256
+   ).hexdigest()
+   return hmac.compare_digest(my_sig, req.headers["x-slack-signature"])
+@app.post("/slack/command")
+async def slack_command(req: Request):
+   body = await req.body()
+   if not verify_slack(req, body.decode()):
+       return PlainTextResponse("Invalid signature", status_code=403)
+   form = dict(x.split("=",1) for x in body.decode().split("&"))
+   text = form.get("text","")
+   cmd = form.get("command","")
+   if cmd == "/create":
+       issue, url = jira_create_issue(text, "Auto-created from Slack")
+       return PlainTextResponse(f"✅ Created {issue}: {url}")
+   if cmd == "/comment":
+       parts = text.split(" ",1)
+       if len(parts)<2: return PlainTextResponse("Usage: /comment KEY-123 Your comment")
+       key, comment = parts
+       jira_add_comment(key, comment)
+       return PlainTextResponse(f"💬 Comment added to {key}")
+   if cmd == "/summarize":
+       parts = text.split(" ",1)
+       if len(parts)<2: return PlainTextResponse("Usage: /summarize KEY-123 Paste notes")
+       key, notes = parts
+       md = summarize_text_markdown(notes)
+       jira_add_comment(key, f"*Meeting Summary*\n{md}")
+       return PlainTextResponse(f"🧠 Summary added to {key}")
+   return PlainTextResponse("Unknown command")
