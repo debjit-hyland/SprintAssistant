@@ -1,6 +1,5 @@
-botbuilder-core
-botbuilder-integration-aiohttp
 fastapi
 python-dotenv
 requests
+slack-sdk
 uvicorn
