@@ -1,0 +1,6 @@
+botbuilder-core
+botbuilder-integration-aiohttp
+fastapi
+python-dotenv
+requests
+uvicorn
