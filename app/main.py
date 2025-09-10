@@ -2,8 +2,8 @@ import os, hmac, hashlib, time
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
-from jira_client import jira_create_issue, jira_add_comment
-from llm_client import summarize_text_markdown
+from app.jira_client import jira_create_issue, jira_add_comment
+from app.llm_client import summarize_text_markdown
 load_dotenv()
 app = FastAPI()
 SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET")
@@ -17,6 +17,7 @@ def verify_slack(req: Request, body: str):
        sig_basestring, hashlib.sha256
    ).hexdigest()
    return hmac.compare_digest(my_sig, req.headers["x-slack-signature"])
+
 @app.post("/slack/command")
 async def slack_command(req: Request):
    body = await req.body()
@@ -25,7 +26,8 @@ async def slack_command(req: Request):
    form = dict(x.split("=",1) for x in body.decode().split("&"))
    text = form.get("text","")
    cmd = form.get("command","")
-   if cmd == "/create":
+   print(f"Received command: {str(cmd)} with text: {text}")
+   if "create" in cmd:
        issue, url = jira_create_issue(text, "Auto-created from Slack")
        return PlainTextResponse(f"✅ Created {issue}: {url}")
    if cmd == "/comment":
