@@ -25,6 +25,9 @@ async def slack_command(req: Request):
    # Parse application/x-www-form-urlencoded safely
    form = urllib.parse.parse_qs(raw.decode())
    # Helpers to get single values
+   print("Form data received:")
+   for k, v in form.items():
+       print(f"{k}: {v}")
    command = form.get("command")[0] # pyright: ignore[reportOptionalSubscript] # debug
    action_data  = command.split(" ")[1:]
    action = action_data[0] if action_data else ""
