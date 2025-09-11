@@ -51,6 +51,7 @@ def jira_create_issue(summary:str, description:str):
       json=payload,
       headers=HEAD
    )
+   print(payload)
    r.raise_for_status(); data=r.json()
    return data["key"], f"{JIRA_BASE}/browse/{data['key']}"
 
