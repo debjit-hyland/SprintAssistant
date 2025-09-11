@@ -1,4 +1,4 @@
-import os, hmac, hashlib, time, urllib.parse
+import os, hmac, hashlib, time, urllib.parse, asyncio
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
@@ -75,8 +75,9 @@ async def slack_command(req: Request):
            notes = " ".join(data.split(" ")[1:])
            if not notes:
                return PlainTextResponse('Usage: /sprint summarize KEY-123 notes')
-           await jira_summarise_async(key=issue, text=notes)
-           return PlainTextResponse(f"🧠 Summary added to {issue}")
+           # Start the summarization in the background without waiting
+           asyncio.create_task(jira_summarise_async(key=issue, text=notes))
+           return PlainTextResponse(f"🧠 Summary being added to {issue}...")
        else:
            return PlainTextResponse("Unknown action. Use: create | update | comment | summarize")
    # Backwards compatibility: if you also configured separate commands
