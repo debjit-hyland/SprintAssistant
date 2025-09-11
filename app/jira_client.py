@@ -1,6 +1,7 @@
 import os, base64, requests
+import aiohttp
 from typing import Optional
-from app.openrouter import ai_response
+from app.openrouter import ai_response, ai_response_async
 from dotenv import load_dotenv
 load_dotenv()
 JIRA_BASE=os.getenv("JIRA_BASE"); JIRA_PROJECT=os.getenv("JIRA_PROJECT")
@@ -66,6 +67,31 @@ def jira_add_comment(key:str, text:str):
                    json={"body":comment_adf},headers=HEAD)
    r.raise_for_status()
 
+async def jira_add_comment_async(key: str, text: str):
+   comment_adf = {
+       "type": "doc",
+       "version": 1,
+       "content": [
+           {
+               "type": "paragraph",
+               "content": [
+                   {
+                       "type": "text",
+                       "text": text
+                   }
+               ]
+           }
+       ]
+   }
+   
+   async with aiohttp.ClientSession() as session:
+       async with session.post(
+           f"{JIRA_BASE}/rest/api/3/issue/{key}/comment",
+           json={"body": comment_adf},
+           headers=HEAD
+       ) as response:
+           response.raise_for_status()
+
 def jira_update_issue(key: str, kv: dict):
    """
    Update fields on an issue.
@@ -99,4 +125,21 @@ def jira_summarise(key: str, text:str):
    if resp is None:
        return False
    jira_add_comment(key, resp["choices"][0]["message"]["content"])
+   return True
+
+async def jira_summarise_async(key: str, text: str):
+   """
+   Add a summary comment to an issue asynchronously.
+   """
+   prompt = f"You are a technical writer for Jira. Turn developer notes into a clear Jira description with:\n"
+   "- Context (1 short paragraph)\n"
+   "- Scope (bullets)\n"
+   "- Acceptance Criteria (Given/When/Then bullets)\n"
+   "Return in bullet points only.\n"
+   
+   resp = await ai_response_async(command=prompt, data=text)
+   if resp is None:
+       return False
+   
+   await jira_add_comment_async(key, resp["choices"][0]["message"]["content"])
    return True

@@ -2,7 +2,7 @@ import os, hmac, hashlib, time, urllib.parse
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
-from app.jira_client import jira_create_issue, jira_update_issue, jira_add_comment, jira_summarise
+from app.jira_client import jira_create_issue, jira_update_issue, jira_add_comment, jira_summarise_async
 
 load_dotenv()
 app = FastAPI()
@@ -75,7 +75,7 @@ async def slack_command(req: Request):
            notes = " ".join(data.split(" ")[1:])
            if not notes:
                return PlainTextResponse('Usage: /sprint summarize KEY-123 notes')
-           jira_summarise(key=issue, text=notes)
+           await jira_summarise_async(key=issue, text=notes)
            return PlainTextResponse(f"🧠 Summary added to {issue}")
        else:
            return PlainTextResponse("Unknown action. Use: create | update | comment | summarize")
