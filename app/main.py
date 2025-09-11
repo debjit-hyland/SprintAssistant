@@ -29,9 +29,9 @@ async def slack_command(req: Request):
    for k, v in form.items():
        print(f"{k}: {v}")
    command = form.get("command")[0] # pyright: ignore[reportOptionalSubscript] # debug
-   action_data  = command.split(" ")[1:]
+   action_data  = form.get("text", [""])[0].split(" ")
    action = action_data[0] if action_data else ""
-   data = "".join(action_data[1:]) if len(action_data) > 1 else ""
+   data = " ".join(action_data[1:]) if len(action_data) > 1 else ""
    # Unified command: /sprint <action> ...
    if command.startswith("/sprint"):
        if not action:
