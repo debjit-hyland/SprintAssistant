@@ -81,7 +81,7 @@ def jira_update_issue(key: str, kv: dict):
        f"{JIRA_BASE}/rest/api/3/issue/{key}",
        json={"fields": fields},
        headers=HEAD,
-       timeout=20,
+       timeout=200,
    )
    r.raise_for_status()
    return True
@@ -90,7 +90,12 @@ def jira_summarise(key: str, text:str):
    """
    Add a summary comment to an issue.
    """
-   resp = ai_response(command="Summarize for JIRA", data=text)
+   prompt = f"You are a technical writer for Jira. Turn developer notes into a clear Jira description with:\n"
+   "- Context (1 short paragraph)\n"
+   "- Scope (bullets)\n"
+   "- Acceptance Criteria (Given/When/Then bullets)\n"
+   "Return in bullet points only.\n"
+   resp = ai_response(command=prompt, data=text)
    if resp is None:
        return False
    jira_add_comment(key, resp["choices"][0]["message"]["content"])
